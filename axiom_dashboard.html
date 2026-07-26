@@ -87,7 +87,7 @@
     </section>
 
     <section class="grid cols-4" style="margin-top:16px">
-      <div class="card metric"><div class="label">Virtual balance</div><div id="balance" class="value">$1,000.00</div><div class="small">Paper portfolio cash · set before start</div></div>
+      <div class="card metric"><div class="label">Virtual balance</div><div id="balance" class="value">$1,000.00</div><div class="small">Paper portfolio cash</div></div>
       <div class="card metric"><div class="label">Realized PnL</div><div id="pnl" class="value">$0.00</div><div class="small">Closed paper trades</div></div>
       <div class="card metric"><div class="label">Open positions</div><div id="positionsCount" class="value">0</div><div class="small">Max controlled by risk rules</div></div>
       <div class="card metric"><div class="label">Signals scanned</div><div id="signalsCount" class="value">0</div><div class="small">Synthetic/offline provider</div></div>
@@ -104,8 +104,6 @@
             <button class="ghost" id="exportBtn">Export audit JSON</button>
           </div>
           <div class="grid cols-2" style="margin-top:16px">
-            <label>Starting balance USD<input id="startingBalance" type="number" min="1" step="1" value="1000" /></label>
-            <label>Apply balance<button class="ghost" id="applyBalanceBtn" type="button">Apply / reset paper account</button></label>
             <label>Polling seconds<input id="pollSeconds" type="number" min="1" step="1" value="3" /></label>
             <label>Minimum score<input id="minimumScore" type="number" min="1" max="100" value="72" /></label>
             <label>Max position USD<input id="maxPosition" type="number" min="1" step="1" value="25" /></label>
@@ -177,7 +175,6 @@
     const state = {
       running: false,
       timer: null,
-      startingBalance: 1000,
       balance: 1000,
       pnl: 0,
       scanned: 0,
@@ -190,7 +187,6 @@
 
     function config() {
       return {
-        startingBalance: number('startingBalance'),
         pollSeconds: number('pollSeconds'),
         minimumScore: number('minimumScore'),
         maxPosition: number('maxPosition'),
@@ -292,26 +288,6 @@
       }
     }
 
-    function applyStartingBalance() {
-      if (state.running) {
-        log('Stop the auto-trader before changing starting balance.');
-        return;
-      }
-      const amount = Math.max(1, config().startingBalance);
-      state.startingBalance = amount;
-      state.balance = amount;
-      state.pnl = 0;
-      state.scanned = 0;
-      state.positions.clear();
-      state.cooldowns.clear();
-      state.audit = [];
-      renderCandidates([]);
-      renderPositions();
-      renderMetrics();
-      audit('paper_account_reset', { startingBalanceUsd: amount });
-      log(`Paper account reset with starting balance ${fmt.format(amount)}`);
-    }
-
     function scan() {
       const cfg = config();
       const candidates = generateCandidates();
@@ -329,10 +305,6 @@
     }
 
     function renderCandidates(rows) {
-      if (!rows.length) {
-        $('candidateRows').innerHTML = '<tr><td colspan="8" style="color:var(--muted)">No candidates scanned yet</td></tr>';
-        return;
-      }
       $('candidateRows').innerHTML = rows.map(({ token, scored, decision }) => `
         <tr>
           <td><strong>${token.symbol}</strong><br><span class="pill">${token.address.slice(0, 8)}…</span></td>
@@ -368,8 +340,6 @@
 
     function start() {
       if (state.running) return;
-      state.startingBalance = Math.max(1, config().startingBalance);
-      if (state.balance <= 0) state.balance = state.startingBalance;
       state.running = true;
       $('statusDot').classList.add('running');
       $('statusText').textContent = 'Running · Paper mode';
@@ -414,9 +384,7 @@
     $('stopBtn').addEventListener('click', stop);
     $('scanBtn').addEventListener('click', scan);
     $('exportBtn').addEventListener('click', exportAudit);
-    $('applyBalanceBtn').addEventListener('click', applyStartingBalance);
     renderMetrics();
-    renderCandidates([]);
     renderPositions();
     log('Dashboard ready. Press Start auto-trader to begin paper-mode scanning.');
   </script>

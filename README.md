@@ -11,7 +11,6 @@ This repository intentionally does **not** include pump-and-dump tooling, market
 - Autonomous strategy loop that scans candidates, scores risk/reward, enters qualified trades, and manages exits.
 - Auto-trader execution boundary (`OrderExecutor`) that supports paper fills now and blocks live orders until an authorized API adapter is implemented.
 - Early-token filters for launch age, market cap, liquidity, volume acceleration, price momentum, taxes, holder concentration, contract verification, mint authority, and liquidity lock status.
-- Starting-balance controls so you can set the paper capital you want to test before the bot starts.
 - Risk management: max position size, max open positions, stop loss, take profit, cooldowns, and daily loss limit.
 - JSONL audit log of every signal, paper buy, and paper sell.
 - Configurable settings for strategy, watchlist, and execution behavior.
@@ -29,7 +28,7 @@ python3 -m http.server 8000
 # then visit http://localhost:8000/axiom_dashboard.html
 ```
 
-The bundled providers generate synthetic market data so you can test the GUI, starting balance, auto-trader, and risk controls offline.
+The bundled providers generate synthetic market data so you can test the GUI, auto-trader, and risk controls offline.
 
 ## Making it live safely
 
