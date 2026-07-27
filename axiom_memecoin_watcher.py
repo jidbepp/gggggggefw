@@ -294,43 +294,19 @@ class TradingGui:
         root.rowconfigure(0, weight=1)
 
         self.status = tk.StringVar(value="Stopped")
-        self.start_balance = tk.StringVar(value=f"{self.engine.config.virtual_balance_usd:.2f}")
         ttk.Label(frame, textvariable=self.status).grid(row=0, column=0, columnspan=3, sticky="w")
-        ttk.Label(frame, text="Starting balance USD").grid(row=1, column=0, sticky="w", pady=(8, 2))
-        ttk.Entry(frame, textvariable=self.start_balance).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-        ttk.Button(frame, text="Apply / Reset Balance", command=self.apply_balance).grid(row=2, column=2, sticky="ew", pady=(0, 8))
-        ttk.Button(frame, text="Start", command=self.start).grid(row=3, column=0, sticky="ew", pady=8)
-        ttk.Button(frame, text="Stop", command=self.stop).grid(row=3, column=1, sticky="ew", pady=8)
-        ttk.Button(frame, text="Quit", command=self.quit).grid(row=3, column=2, sticky="ew", pady=8)
+        ttk.Button(frame, text="Start", command=self.start).grid(row=1, column=0, sticky="ew", pady=8)
+        ttk.Button(frame, text="Stop", command=self.stop).grid(row=1, column=1, sticky="ew", pady=8)
+        ttk.Button(frame, text="Quit", command=self.quit).grid(row=1, column=2, sticky="ew", pady=8)
 
         self.output = tk.Text(frame, height=24, width=110)
-        self.output.grid(row=4, column=0, columnspan=3, sticky="nsew")
-        frame.rowconfigure(4, weight=1)
+        self.output.grid(row=2, column=0, columnspan=3, sticky="nsew")
+        frame.rowconfigure(2, weight=1)
         for column in range(3):
             frame.columnconfigure(column, weight=1)
 
-    def apply_balance(self) -> bool:
-        if self.running.is_set():
-            self._append("Stop the auto-trader before changing starting balance.")
-            return False
-        try:
-            amount = max(1.0, float(self.start_balance.get()))
-        except ValueError:
-            self._append("Invalid starting balance. Enter a positive number.")
-            return False
-        self.engine.config.virtual_balance_usd = amount
-        self.engine.balance = amount
-        self.engine.realized_pnl = 0.0
-        self.engine.positions.clear()
-        self.engine.cooldowns.clear()
-        self.engine._audit("paper_account_reset", {"starting_balance_usd": amount})
-        self._append(f"Paper account reset with starting balance ${amount:.2f}")
-        return True
-
     def start(self) -> None:
         if self.running.is_set():
-            return
-        if not self.apply_balance():
             return
         self.running.set()
         mode = "PAPER MODE" if self.engine.config.paper_mode else "LIVE MODE"
