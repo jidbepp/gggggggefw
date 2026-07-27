@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Axiom Professional Meme-Coin Auto-Trader Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: #0d1b2f;
+      --panel-2: #10243d;
+      --text: #e6f1ff;
+      --muted: #8aa4c6;
+      --green: #3ef08a;
+      --red: #ff5d73;
+      --yellow: #ffd166;
+      --blue: #5eb1ff;
+      --purple: #b78cff;
+      --border: rgba(255,255,255,0.1);
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, rgba(94,177,255,0.16), transparent 30%), var(--bg);
+      color: var(--text);
+      font: 14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .shell { max-width: 1480px; margin: 0 auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 18px; }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 38px); letter-spacing: -0.04em; }
+    .subtitle { color: var(--muted); max-width: 840px; margin-top: 6px; }
+    .badge { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--muted); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 18px currentColor; }
+    .dot.running { background: var(--green); }
+    .grid { display: grid; gap: 16px; }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: 1.2fr 1fr 1fr; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; }
+    .card h2 { margin: 0; padding: 18px 18px 0; font-size: 15px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .card-body { padding: 18px; }
+    .metric { padding: 18px; }
+    .metric .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .metric .value { font-size: 28px; font-weight: 800; margin-top: 6px; letter-spacing: -0.03em; }
+    .metric .small { color: var(--muted); margin-top: 4px; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; }
+    button, select, input { border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); color: var(--text); padding: 11px 13px; font: inherit; }
+    button { cursor: pointer; font-weight: 700; transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease; }
+    button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+    button.primary { background: linear-gradient(135deg, #2ed47a, #19a974); color: #04130b; }
+    button.danger { background: linear-gradient(135deg, #ff5d73, #c9184a); color: #fff; }
+    button.ghost { background: rgba(255,255,255,0.04); }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    input { width: 100%; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    tr:hover td { background: rgba(255,255,255,0.025); }
+    .score { font-weight: 800; }
+    .score.good { color: var(--green); }
+    .score.warn { color: var(--yellow); }
+    .score.bad { color: var(--red); }
+    .pill { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+    .pill.buy { color: var(--green); border-color: rgba(62,240,138,0.35); background: rgba(62,240,138,0.08); }
+    .pill.sell { color: var(--red); border-color: rgba(255,93,115,0.35); background: rgba(255,93,115,0.08); }
+    .log { height: 360px; overflow: auto; background: rgba(0,0,0,0.18); border-radius: 16px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .log-line { padding: 7px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); color: #bfd2ed; }
+    .warning { border-left: 4px solid var(--yellow); background: rgba(255,209,102,0.08); padding: 14px; border-radius: 14px; color: #ffe8a3; }
+    .footer { color: var(--muted); margin-top: 20px; font-size: 12px; }
+    @media (max-width: 1100px) { .cols-4, .cols-3, .cols-2 { grid-template-columns: 1fr; } header { align-items: flex-start; flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Axiom Professional Meme-Coin Auto-Trader</h1>
+        <div class="subtitle">HTML dashboard for autonomous paper-mode scanning, scoring, order simulation, risk controls, and audit logging. Live integrations must use authorized APIs and are intentionally not enabled in this static file.</div>
+      </div>
+      <div class="badge"><span id="statusDot" class="dot"></span><span id="statusText">Stopped · Paper mode · Chromebook ready</span></div>
+    </header>
+
+    <section class="warning">
+      This dashboard does not guarantee no-loss trading, predict pumps with certainty, front-run markets, or bypass axiom.trade protections. It is a professional paper-trading control surface and integration scaffold.
+    </section>
+
+    <section class="grid cols-4" style="margin-top:16px">
+      <div class="card metric"><div class="label">Virtual balance</div><div id="balance" class="value">$1,000.00</div><div class="small">Paper portfolio cash · set before start</div></div>
+      <div class="card metric"><div class="label">Realized PnL</div><div id="pnl" class="value">$0.00</div><div class="small">Closed paper trades</div></div>
+      <div class="card metric"><div class="label">Open positions</div><div id="positionsCount" class="value">0</div><div class="small">Max controlled by risk rules</div></div>
+      <div class="card metric"><div class="label">Signals scanned</div><div id="signalsCount" class="value">0</div><div class="small" id="providerLabel">Synthetic/offline provider</div></div>
+    </section>
+
+    <section class="grid cols-3" style="margin-top:16px">
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="card-body">
+          <div class="controls">
+            <button class="primary" id="startBtn">Start auto-trader</button>
+            <button class="danger" id="stopBtn">Stop</button>
+            <button class="ghost" id="scanBtn">Scan once</button>
+            <button class="ghost" id="exportBtn">Export audit JSON</button>
+            <button class="ghost" id="saveSettingsBtn">Save settings</button>
+          </div>
+          <div class="grid cols-2" style="margin-top:16px">
+            <label>Starting balance USD<input id="startingBalance" type="number" min="1" step="1" value="1000" /></label>
+            <label>Apply balance<button class="ghost" id="applyBalanceBtn" type="button">Apply / reset paper account</button></label>
+            <label>Polling seconds<input id="pollSeconds" type="number" min="1" step="1" value="3" /></label>
+            <label>Minimum score<input id="minimumScore" type="number" min="1" max="100" value="72" /></label>
+            <label>Max position USD<input id="maxPosition" type="number" min="1" step="1" value="25" /></label>
+            <label>Max open positions<input id="maxOpen" type="number" min="1" step="1" value="3" /></label>
+            <label>Stop loss %<input id="stopLoss" type="number" min="1" step="1" value="12" /></label>
+            <label>Take profit %<input id="takeProfit" type="number" min="1" step="1" value="35" /></label>
+            <label>Daily loss limit USD<input id="dailyLoss" type="number" min="1" step="1" value="75" /></label>
+            <label>Cooldown seconds<input id="cooldown" type="number" min="0" step="1" value="120" /></label>
+            <label>Trading mode<select id="tradingMode"><option value="paper">Paper / sandbox</option><option value="live_bridge">Live backend bridge</option></select></label>
+            <label>Backend bridge URL<input id="backendUrl" type="url" placeholder="https://your-backend.example" /></label>
+            <label>Enable live funds<input id="enableLiveFunds" type="checkbox" /></label>
+            <label>Backend tools<button class="ghost" id="testBackendBtn" type="button">Test backend bridge</button></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Watchlist filters</h2>
+        <div class="card-body grid cols-2">
+          <label>Min age minutes<input id="minAge" type="number" value="1" /></label>
+          <label>Max age minutes<input id="maxAge" type="number" value="120" /></label>
+          <label>Max market cap<input id="maxMarketCap" type="number" value="250000" /></label>
+          <label>Min liquidity<input id="minLiquidity" type="number" value="8000" /></label>
+          <label>Max top 10 holder %<input id="maxTop10" type="number" value="45" /></label>
+          <label>Max buy tax %<input id="maxBuyTax" type="number" value="5" /></label>
+          <label>Max sell tax %<input id="maxSellTax" type="number" value="5" /></label>
+          <label>Volume acceleration<input id="minVolumeAcceleration" type="number" step="0.1" value="1.8" /></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Execution model</h2>
+        <div class="card-body">
+          <p><span class="pill buy" id="modePill">PAPER / SANDBOX</span></p>
+          <p style="color:var(--muted)">Chromebook-ready: open this file in Chrome or serve it with <code>python3 -m http.server</code>. Paper mode works fully offline.</p>
+          <p style="color:var(--muted)">Live funds require a separate backend bridge you control. The browser sends signed-in backend requests only; it never stores seed phrases, private keys, or exchange secrets.</p>
+          <p style="color:var(--muted)">Every signal and order is written to the in-memory audit log and can be exported for backtesting review.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid cols-2" style="margin-top:16px">
+      <div class="card">
+        <h2>Scored token candidates</h2>
+        <div class="card-body" style="overflow:auto">
+          <table>
+            <thead><tr><th>Token</th><th>Score</th><th>Price</th><th>Liq</th><th>MCap</th><th>Age</th><th>Momentum</th><th>Decision</th></tr></thead>
+            <tbody id="candidateRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Open paper positions</h2>
+        <div class="card-body" style="overflow:auto">
+          <table>
+            <thead><tr><th>Token</th><th>Entry</th><th>Size</th><th>Opened</th><th>Status</th></tr></thead>
+            <tbody id="positionRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Audit log</h2>
+      <div class="card-body"><div id="log" class="log"></div></div>
+    </section>
+
+    <div class="footer">Static HTML demo. For production, move secrets and order signing to a backend service, add authenticated sessions, rate limiting, deterministic tests, provider health checks, and persistent storage.</div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    const state = {
+      running: false,
+      timer: null,
+      startingBalance: 1000,
+      balance: 1000,
+      pnl: 0,
+      scanned: 0,
+      positions: new Map(),
+      cooldowns: new Map(),
+      audit: [],
+      backendHealthy: false
+    };
+
+    const storageKey = 'axiom-dashboard-settings-v2';
+
+    const symbols = ['BONKX', 'PEPEAI', 'WOJAK2', 'MOONL', 'DOGGO', 'FROG', 'CATWIF', 'POPCATX', 'BODEN2', 'SNEKAI'];
+
+    function config() {
+      return {
+        startingBalance: number('startingBalance'),
+        pollSeconds: number('pollSeconds'),
+        minimumScore: number('minimumScore'),
+        maxPosition: number('maxPosition'),
+        maxOpen: number('maxOpen'),
+        stopLoss: number('stopLoss'),
+        takeProfit: number('takeProfit'),
+        dailyLoss: number('dailyLoss'),
+        cooldown: number('cooldown'),
+        minAge: number('minAge'),
+        maxAge: number('maxAge'),
+        maxMarketCap: number('maxMarketCap'),
+        minLiquidity: number('minLiquidity'),
+        maxTop10: number('maxTop10'),
+        maxBuyTax: number('maxBuyTax'),
+        maxSellTax: number('maxSellTax'),
+        minVolumeAcceleration: number('minVolumeAcceleration'),
+        tradingMode: $('tradingMode').value,
+        backendUrl: $('backendUrl').value.trim().replace(/\/$/, ''),
+        enableLiveFunds: $('enableLiveFunds').checked
+      };
+    }
+
+    function number(id) { return Number($(id).value); }
+    function random(min, max) { return min + Math.random() * (max - min); }
+    function choice(list) { return list[Math.floor(Math.random() * list.length)]; }
+    function address() { return '0x' + Array.from({ length: 40 }, () => choice('abcdef0123456789')).join(''); }
+    function now() { return new Date().toISOString(); }
+
+    async function fetchCandidates(cfg) {
+      if (cfg.tradingMode !== 'live_bridge') return generateCandidates();
+      if (!cfg.backendUrl) throw new Error('Backend bridge URL is required for live bridge mode.');
+      const response = await fetch(`${cfg.backendUrl}/candidates`, { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) throw new Error(`Backend candidate fetch failed: ${response.status}`);
+      const data = await response.json();
+      if (!Array.isArray(data.candidates)) throw new Error('Backend response must include a candidates array.');
+      return data.candidates.map(normalizeBackendCandidate);
+    }
+
+    function normalizeBackendCandidate(token) {
+      return {
+        symbol: String(token.symbol || 'UNKNOWN'),
+        address: String(token.address || address()),
+        price: Number(token.price ?? token.price_usd ?? 0),
+        liquidity: Number(token.liquidity ?? token.liquidity_usd ?? 0),
+        volume5m: Number(token.volume5m ?? token.volume_5m_usd ?? 0),
+        volume1h: Number(token.volume1h ?? token.volume_1h_usd ?? 1),
+        priceChange5m: Number(token.priceChange5m ?? token.price_change_5m_pct ?? 0),
+        top10: Number(token.top10 ?? token.top10_holder_pct ?? 100),
+        buyTax: Number(token.buyTax ?? token.buy_tax_pct ?? 100),
+        sellTax: Number(token.sellTax ?? token.sell_tax_pct ?? 100),
+        verified: Boolean(token.verified ?? token.contract_verified),
+        mintDisabled: Boolean(token.mintDisabled ?? token.mint_disabled),
+        liquidityLocked: Boolean(token.liquidityLocked ?? token.liquidity_locked),
+        age: Number(token.age ?? token.age_minutes ?? 999),
+        marketCap: Number(token.marketCap ?? token.market_cap_usd ?? Number.MAX_SAFE_INTEGER)
+      };
+    }
+
+    function generateCandidates(count = 8) {
+      return Array.from({ length: count }, () => ({
+        symbol: choice(symbols),
+        address: address(),
+        price: random(0.000001, 0.003),
+        liquidity: random(2000, 90000),
+        volume5m: random(100, 35000),
+        volume1h: random(500, 130000),
+        priceChange5m: random(-20, 60),
+        top10: random(15, 78),
+        buyTax: random(0, 12),
+        sellTax: random(0, 14),
+        verified: Math.random() > 0.18,
+        mintDisabled: Math.random() > 0.2,
+        liquidityLocked: Math.random() > 0.25,
+        age: random(1, 180),
+        marketCap: random(25000, 950000)
+      }));
+    }
+
+    function scoreToken(token, cfg) {
+      let score = 0;
+      const reasons = [];
+      if (token.verified) score += 15; else reasons.push('unverified contract');
+      if (token.mintDisabled) score += 15; else reasons.push('mint active risk');
+      if (token.liquidityLocked) score += 15; else reasons.push('liquidity unlocked');
+      if (token.liquidity >= cfg.minLiquidity) score += 15; else reasons.push('low liquidity');
+      if (token.top10 <= cfg.maxTop10) score += 15; else reasons.push('holder concentration');
+      if (token.buyTax <= cfg.maxBuyTax && token.sellTax <= cfg.maxSellTax) score += 10; else reasons.push('high tax');
+      if (token.age >= cfg.minAge && token.age <= cfg.maxAge) score += 5; else reasons.push('age outside window');
+      if (token.marketCap <= cfg.maxMarketCap) score += 5; else reasons.push('market cap high');
+      const volumeAcceleration = token.volume5m / Math.max(token.volume1h / 12, 1);
+      if (volumeAcceleration >= cfg.minVolumeAcceleration && volumeAcceleration <= 8 && token.priceChange5m >= 3 && token.priceChange5m <= 35) score += 15;
+      else reasons.push('weak/overheated momentum');
+      return { score: Math.min(score, 100), reasons, volumeAcceleration };
+    }
+
+    function canEnter(token, scored, cfg) {
+      const cooldownUntil = state.cooldowns.get(token.address) || 0;
+      return scored.score >= cfg.minimumScore &&
+        state.positions.size < cfg.maxOpen &&
+        !state.positions.has(token.address) &&
+        Date.now() >= cooldownUntil &&
+        state.pnl > -cfg.dailyLoss &&
+        state.balance >= cfg.maxPosition;
+    }
+
+    async function enter(token, scored, cfg) {
+      await placeOrder('buy', token, cfg.maxPosition, cfg);
+      state.balance -= cfg.maxPosition;
+      state.positions.set(token.address, {
+        ...token,
+        entry: token.price,
+        size: cfg.maxPosition,
+        openedAt: now(),
+        score: scored.score
+      });
+      const eventName = cfg.tradingMode === 'paper' ? 'paper_buy' : 'live_bridge_buy';
+      audit(eventName, { symbol: token.symbol, address: token.address, score: scored.score, sizeUsd: cfg.maxPosition });
+      log(`${cfg.tradingMode === 'paper' ? 'PAPER BUY' : 'LIVE BRIDGE BUY'} ${token.symbol} size=${fmt.format(cfg.maxPosition)} score=${scored.score}`);
+    }
+
+    async function placeOrder(side, tokenOrPosition, sizeUsd, cfg, reason = '') {
+      if (cfg.tradingMode === 'paper') {
+        return { status: 'filled', mode: 'paper', side, sizeUsd };
+      }
+      if (!cfg.enableLiveFunds) throw new Error('Live funds checkbox must be enabled before sending live bridge orders.');
+      if (!state.backendHealthy) throw new Error('Backend bridge must pass health check before live orders.');
+      if (!cfg.backendUrl) throw new Error('Backend bridge URL is required.');
+      const response = await fetch(`${cfg.backendUrl}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ side, symbol: tokenOrPosition.symbol, address: tokenOrPosition.address, sizeUsd, reason })
+      });
+      if (!response.ok) throw new Error(`Backend order failed: ${response.status}`);
+      return response.json();
+    }
+
+    async function managePositions(cfg) {
+      for (const [addr, pos] of [...state.positions.entries()]) {
+        const movePct = random(-18, 45);
+        if (movePct <= -cfg.stopLoss || movePct >= cfg.takeProfit) {
+          const pnl = pos.size * movePct / 100;
+          const reason = pnl < 0 ? 'STOP' : 'TAKE PROFIT';
+          state.balance += pos.size + pnl;
+          state.pnl += pnl;
+          state.positions.delete(addr);
+          state.cooldowns.set(addr, Date.now() + cfg.cooldown * 1000);
+          await placeOrder('sell', pos, pos.size, cfg, reason);
+          audit(cfg.tradingMode === 'paper' ? 'paper_sell' : 'live_bridge_sell', { symbol: pos.symbol, address: addr, reason, pnlUsd: round(pnl), movePct: round(movePct) });
+          log(`${reason} ${pos.symbol} pnl=${fmt.format(pnl)} move=${round(movePct)}%`);
+        }
+      }
+    }
+
+    function applyStartingBalance() {
+      if (state.running) {
+        log('Stop the auto-trader before changing starting balance.');
+        return;
+      }
+      const amount = Math.max(1, config().startingBalance);
+      state.startingBalance = amount;
+      state.balance = amount;
+      state.pnl = 0;
+      state.scanned = 0;
+      state.positions.clear();
+      state.cooldowns.clear();
+      state.audit = [];
+      renderCandidates([]);
+      renderPositions();
+      renderMetrics();
+      audit('paper_account_reset', { startingBalanceUsd: amount });
+      log(`Paper account reset with starting balance ${fmt.format(amount)}`);
+    }
+
+    async function scan() {
+      const cfg = config();
+      try {
+        updateModeUi(cfg);
+        const candidates = await fetchCandidates(cfg);
+        state.scanned += candidates.length;
+        const rows = [];
+        for (const token of candidates) {
+          const scored = scoreToken(token, cfg);
+          audit('signal', { token, score: scored.score, reasons: scored.reasons, mode: cfg.tradingMode });
+          if (canEnter(token, scored, cfg)) await enter(token, scored, cfg);
+          rows.push({ token, scored, decision: scored.score >= cfg.minimumScore ? 'Qualified' : scored.reasons.slice(0, 2).join(', ') });
+        }
+        rows.sort((a, b) => b.scored.score - a.scored.score);
+        await managePositions(cfg);
+        renderCandidates(rows);
+        renderPositions();
+        renderMetrics();
+      } catch (error) {
+        log(`ERROR: ${error.message}`);
+        stop();
+      }
+    }
+
+    function renderCandidates(rows) {
+      if (!rows.length) {
+        $('candidateRows').innerHTML = '<tr><td colspan="8" style="color:var(--muted)">No candidates scanned yet</td></tr>';
+        return;
+      }
+      $('candidateRows').innerHTML = rows.map(({ token, scored, decision }) => `
+        <tr>
+          <td><strong>${token.symbol}</strong><br><span class="pill">${token.address.slice(0, 8)}…</span></td>
+          <td class="score ${scored.score >= 72 ? 'good' : scored.score >= 55 ? 'warn' : 'bad'}">${scored.score}</td>
+          <td>${fmt.format(token.price)}</td>
+          <td>${fmt.format(token.liquidity)}</td>
+          <td>${fmt.format(token.marketCap)}</td>
+          <td>${round(token.age)}m</td>
+          <td>${round(scored.volumeAcceleration)}x / ${round(token.priceChange5m)}%</td>
+          <td>${decision === 'Qualified' ? '<span class="pill buy">Qualified</span>' : `<span class="pill">${decision}</span>`}</td>
+        </tr>`).join('');
+    }
+
+    function renderPositions() {
+      const rows = [...state.positions.values()].map((pos) => `
+        <tr>
+          <td><strong>${pos.symbol}</strong><br><span class="pill">score ${pos.score}</span></td>
+          <td>${fmt.format(pos.entry)}</td>
+          <td>${fmt.format(pos.size)}</td>
+          <td>${pos.openedAt.slice(11, 19)} UTC</td>
+          <td><span class="pill buy">Open</span></td>
+        </tr>`).join('');
+      $('positionRows').innerHTML = rows || '<tr><td colspan="5" style="color:var(--muted)">No open paper positions</td></tr>';
+    }
+
+    function renderMetrics() {
+      $('balance').textContent = fmt.format(state.balance);
+      $('pnl').textContent = fmt.format(state.pnl);
+      $('pnl').style.color = state.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      $('positionsCount').textContent = String(state.positions.size);
+      $('signalsCount').textContent = String(state.scanned);
+    }
+
+    function start() {
+      if (state.running) return;
+      state.startingBalance = Math.max(1, config().startingBalance);
+      if (state.balance <= 0) state.balance = state.startingBalance;
+      state.running = true;
+      $('statusDot').classList.add('running');
+      const cfg = config();
+      $('statusText').textContent = `Running · ${cfg.tradingMode === 'live_bridge' ? 'Live bridge' : 'Paper mode'}`;
+      log(`Auto-trader started in ${cfg.tradingMode === 'live_bridge' ? 'LIVE BRIDGE' : 'PAPER MODE'}`);
+      scan();
+      state.timer = setInterval(() => scan(), Math.max(1, config().pollSeconds) * 1000);
+    }
+
+    function stop() {
+      state.running = false;
+      $('statusDot').classList.remove('running');
+      updateModeUi();
+      if (state.timer) clearInterval(state.timer);
+      state.timer = null;
+      log('Auto-trader stopped');
+    }
+
+    function audit(event, payload) {
+      state.audit.push({ ts: now(), event, ...payload });
+    }
+
+    function log(message) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = `[${now()}] ${message}`;
+      $('log').prepend(line);
+    }
+
+    async function testBackend() {
+      const cfg = config();
+      if (!cfg.backendUrl) { log('Backend URL is required for health check.'); return; }
+      try {
+        const response = await fetch(`${cfg.backendUrl}/health`, { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error(`health returned ${response.status}`);
+        state.backendHealthy = true;
+        log('Backend bridge health check passed. Live bridge can be armed if you enable live funds.');
+      } catch (error) {
+        state.backendHealthy = false;
+        log(`Backend bridge health check failed: ${error.message}`);
+      }
+      updateModeUi(cfg);
+    }
+
+    function saveSettings() {
+      localStorage.setItem(storageKey, JSON.stringify(config()));
+      log('Settings saved in this browser.');
+    }
+
+    function loadSettings() {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        for (const [key, value] of Object.entries(saved)) {
+          const el = $(key);
+          if (!el) continue;
+          if (el.type === 'checkbox') el.checked = Boolean(value);
+          else el.value = value;
+        }
+        log('Saved settings loaded from this browser.');
+      } catch {
+        log('Saved settings could not be loaded; using defaults.');
+      }
+    }
+
+    function updateModeUi(cfg = config()) {
+      const live = cfg.tradingMode === 'live_bridge';
+      $('modePill').textContent = live ? (cfg.enableLiveFunds ? 'LIVE BACKEND BRIDGE ARMED' : 'LIVE BRIDGE DISARMED') : 'PAPER / SANDBOX';
+      $('modePill').className = live && cfg.enableLiveFunds ? 'pill sell' : 'pill buy';
+      $('providerLabel').textContent = live ? 'Backend bridge provider' : 'Synthetic/offline provider';
+      if (!state.running) $('statusText').textContent = `Stopped · ${live ? 'Live bridge' : 'Paper mode'} · Chromebook ready`;
+    }
+
+    function exportAudit() {
+      const blob = new Blob([JSON.stringify(state.audit, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `axiom-paper-audit-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function round(value) { return Math.round(value * 100) / 100; }
+
+    $('startBtn').addEventListener('click', start);
+    $('stopBtn').addEventListener('click', stop);
+    $('scanBtn').addEventListener('click', () => scan());
+    $('exportBtn').addEventListener('click', exportAudit);
+    $('applyBalanceBtn').addEventListener('click', applyStartingBalance);
+    $('testBackendBtn').addEventListener('click', testBackend);
+    $('saveSettingsBtn').addEventListener('click', saveSettings);
+    $('tradingMode').addEventListener('change', () => updateModeUi());
+    $('enableLiveFunds').addEventListener('change', () => updateModeUi());
+    loadSettings();
+    updateModeUi();
+    renderMetrics();
+    renderCandidates([]);
+    renderPositions();
+    log('Dashboard ready. Press Start auto-trader to begin paper-mode scanning.');
+  </script>
+</body>
+</html>
