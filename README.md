@@ -12,6 +12,10 @@ This repository intentionally does **not** include pump-and-dump tooling, market
 - Auto-trader execution boundary (`OrderExecutor`) that supports paper fills now and blocks live orders until an authorized API adapter is implemented.
 - Early-token filters for launch age, market cap, liquidity, volume acceleration, price momentum, taxes, holder concentration, contract verification, mint authority, and liquidity lock status.
 - Starting-balance controls so you can set the paper capital you want to test before the bot starts.
+- Static HTML dashboard (`axiom_dashboard.html`) for browser-based paper-mode scanning, scoring, risk controls, positions, and audit export.
+- Autonomous strategy loop that scans candidates, scores risk/reward, enters qualified trades, and manages exits.
+- Auto-trader execution boundary (`OrderExecutor`) that supports paper fills now and blocks live orders until an authorized API adapter is implemented.
+- Early-token filters for launch age, market cap, liquidity, volume acceleration, price momentum, taxes, holder concentration, contract verification, mint authority, and liquidity lock status.
 - Risk management: max position size, max open positions, stop loss, take profit, cooldowns, and daily loss limit.
 - JSONL audit log of every signal, paper buy, and paper sell.
 - Configurable settings for strategy, watchlist, and execution behavior.
@@ -23,6 +27,7 @@ python3 axiom_memecoin_watcher.py --config settings.example.json
 ```
 
 Or open the Chromebook/browser dashboard directly:
+Or open the browser dashboard directly:
 
 ```bash
 python3 -m http.server 8000
@@ -30,6 +35,7 @@ python3 -m http.server 8000
 ```
 
 The browser dashboard is fully functional in offline paper mode on a Chromebook. It can also authenticate to a live backend bridge with `POST /auth/login`, `GET /health`, `GET /candidates`, and `POST /orders` endpoints, but Axiom passwords, private keys, exchange secrets, wallet signing, and API credentials must stay on that backend instead of in the static HTML.
+The bundled providers generate synthetic market data so you can test the GUI, auto-trader, and risk controls offline.
 
 ## Making it live safely
 
@@ -39,6 +45,9 @@ The browser dashboard is fully functional in offline paper mode on a Chromebook.
 4. For the Python app, implement a dedicated live subclass/adapter for `OrderExecutor.buy()` and `OrderExecutor.sell()` using a broker or exchange API you are authorized to use.
 5. Backtest and forward-test with logs before enabling live orders.
 6. Only enable live bridge/live order settings after you understand the failure modes, fees, slippage, and legal/compliance obligations.
+3. Implement a dedicated live subclass/adapter for `OrderExecutor.buy()` and `OrderExecutor.sell()` using a broker or exchange API you are authorized to use.
+4. Backtest and forward-test with logs before enabling live orders.
+5. Only set `mode` to `live` and `trade.allow_live_orders` to `true` after you understand the failure modes, fees, slippage, and legal/compliance obligations.
 
 ## Why no "no-loss sniper" claim?
 

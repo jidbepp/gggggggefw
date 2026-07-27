@@ -332,6 +332,20 @@ class TradingGui:
             return
         if not self.apply_balance():
             return
+        ttk.Label(frame, textvariable=self.status).grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Button(frame, text="Start", command=self.start).grid(row=1, column=0, sticky="ew", pady=8)
+        ttk.Button(frame, text="Stop", command=self.stop).grid(row=1, column=1, sticky="ew", pady=8)
+        ttk.Button(frame, text="Quit", command=self.quit).grid(row=1, column=2, sticky="ew", pady=8)
+
+        self.output = tk.Text(frame, height=24, width=110)
+        self.output.grid(row=2, column=0, columnspan=3, sticky="nsew")
+        frame.rowconfigure(2, weight=1)
+        for column in range(3):
+            frame.columnconfigure(column, weight=1)
+
+    def start(self) -> None:
+        if self.running.is_set():
+            return
         self.running.set()
         mode = "PAPER MODE" if self.engine.config.paper_mode else "LIVE MODE"
         self.status.set(f"Running in {mode}")
