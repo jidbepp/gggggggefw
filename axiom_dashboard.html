@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Axiom Professional Meme-Coin Auto-Trader Dashboard</title>
+  <link rel="stylesheet" href="assets/axiom_dashboard.css" />
+
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Axiom Professional Meme-Coin Auto-Trader</h1>
+        <div class="subtitle">HTML dashboard for autonomous paper-mode scanning, scoring, order simulation, risk controls, and audit logging. Live integrations must use authorized APIs and are intentionally not enabled in this static file.</div>
+      </div>
+      <div class="badge"><span id="statusDot" class="dot"></span><span id="statusText">Stopped · Paper mode · Chromebook ready</span></div>
+    </header>
+
+    <section class="warning">
+      This dashboard does not guarantee no-loss trading, predict pumps with certainty, front-run markets, or bypass axiom.trade protections. It is a professional paper-trading control surface and integration scaffold.
+    </section>
+
+    <section class="grid cols-4" style="margin-top:16px">
+      <div class="card metric"><div class="label">Virtual balance</div><div id="balance" class="value">$1,000.00</div><div class="small">Paper portfolio cash · set before start</div></div>
+      <div class="card metric"><div class="label">Realized PnL</div><div id="pnl" class="value">$0.00</div><div class="small">Closed paper trades</div></div>
+      <div class="card metric"><div class="label">Open positions</div><div id="positionsCount" class="value">0</div><div class="small">Max controlled by risk rules</div></div>
+      <div class="card metric"><div class="label">Signals scanned</div><div id="signalsCount" class="value">0</div><div class="small" id="providerLabel">Synthetic/offline provider</div></div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Secure live account connection</h2>
+      <div class="card-body">
+        <div class="warning" style="margin-bottom:12px">Do not enter your axiom.trade password into a static HTML file. For professional live access, authenticate to your own backend bridge and let that server connect to authorized Axiom/API integrations.</div>
+        <div class="auth-row">
+          <label>Backend login email<input id="backendEmail" type="email" autocomplete="username" placeholder="you@example.com" /></label>
+          <label>Backend password<input id="backendPassword" type="password" autocomplete="current-password" placeholder="Backend password only" /></label>
+          <button class="primary" id="loginBackendBtn" type="button">Connect backend</button>
+          <button class="ghost" id="logoutBackendBtn" type="button">Disconnect</button>
+        </div>
+        <div style="margin-top:10px"><span class="pill" id="authStatus">Backend not connected</span></div>
+      </div>
+    </section>
+
+    <section class="grid cols-3" style="margin-top:16px">
+      <div class="card">
+        <h2>Controls</h2>
+        <div class="card-body">
+          <div class="controls">
+            <button class="primary" id="startBtn">Start auto-trader</button>
+            <button class="danger" id="stopBtn">Stop</button>
+            <button class="ghost" id="scanBtn">Scan once</button>
+            <button class="ghost" id="exportBtn">Export audit JSON</button>
+            <button class="ghost" id="saveSettingsBtn">Save settings</button>
+          </div>
+          <div class="grid cols-2" style="margin-top:16px">
+            <label>Starting balance USD<input id="startingBalance" type="number" min="1" step="1" value="1000" /></label>
+            <label>Apply balance<button class="ghost" id="applyBalanceBtn" type="button">Apply / reset paper account</button></label>
+            <label>Polling seconds<input id="pollSeconds" type="number" min="1" step="1" value="3" /></label>
+            <label>Minimum score<input id="minimumScore" type="number" min="1" max="100" value="72" /></label>
+            <label>Max position USD<input id="maxPosition" type="number" min="1" step="1" value="25" /></label>
+            <label>Max open positions<input id="maxOpen" type="number" min="1" step="1" value="3" /></label>
+            <label>Stop loss %<input id="stopLoss" type="number" min="1" step="1" value="12" /></label>
+            <label>Take profit %<input id="takeProfit" type="number" min="1" step="1" value="35" /></label>
+            <label>Daily loss limit USD<input id="dailyLoss" type="number" min="1" step="1" value="75" /></label>
+            <label>Cooldown seconds<input id="cooldown" type="number" min="0" step="1" value="120" /></label>
+            <label>Trading mode<select id="tradingMode"><option value="paper">Paper / sandbox</option><option value="live_bridge">Live backend bridge</option></select></label>
+            <label>Backend bridge URL<input id="backendUrl" type="url" placeholder="https://your-backend.example" /></label>
+            <label>Enable live funds<input id="enableLiveFunds" type="checkbox" /></label>
+            <label>Backend tools<button class="ghost" id="testBackendBtn" type="button">Test backend bridge</button></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Watchlist filters</h2>
+        <div class="card-body grid cols-2">
+          <label>Min age minutes<input id="minAge" type="number" value="1" /></label>
+          <label>Max age minutes<input id="maxAge" type="number" value="120" /></label>
+          <label>Max market cap<input id="maxMarketCap" type="number" value="250000" /></label>
+          <label>Min liquidity<input id="minLiquidity" type="number" value="8000" /></label>
+          <label>Max top 10 holder %<input id="maxTop10" type="number" value="45" /></label>
+          <label>Max buy tax %<input id="maxBuyTax" type="number" value="5" /></label>
+          <label>Max sell tax %<input id="maxSellTax" type="number" value="5" /></label>
+          <label>Volume acceleration<input id="minVolumeAcceleration" type="number" step="0.1" value="1.8" /></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Execution model</h2>
+        <div class="card-body">
+          <p><span class="pill buy" id="modePill">PAPER / SANDBOX</span></p>
+          <p style="color:var(--muted)">Chromebook-ready: open this file in Chrome or serve it with <code>python3 -m http.server</code>. Paper mode works fully offline.</p>
+          <p style="color:var(--muted)">Live funds require a separate backend bridge you control. The browser sends signed-in backend requests only; it never stores seed phrases, private keys, or exchange secrets.</p>
+          <p style="color:var(--muted)">Every signal and order is written to the in-memory audit log and can be exported for backtesting review.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid cols-2" style="margin-top:16px">
+      <div class="card">
+        <h2>Scored token candidates</h2>
+        <div class="card-body" style="overflow:auto">
+          <table>
+            <thead><tr><th>Token</th><th>Score</th><th>Price</th><th>Liq</th><th>MCap</th><th>Age</th><th>Momentum</th><th>Decision</th></tr></thead>
+            <tbody id="candidateRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Open paper positions</h2>
+        <div class="card-body" style="overflow:auto">
+          <table>
+            <thead><tr><th>Token</th><th>Entry</th><th>Size</th><th>Opened</th><th>Status</th></tr></thead>
+            <tbody id="positionRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h2>Audit log</h2>
+      <div class="card-body"><div id="log" class="log"></div></div>
+    </section>
+
+    <div class="footer">Static HTML demo. For production, move secrets and order signing to a backend service, add authenticated sessions, rate limiting, deterministic tests, provider health checks, and persistent storage.</div>
+  </main>
+
+  <script src="assets/axiom_dashboard.js" defer></script>
+
+</body>
+</html>
