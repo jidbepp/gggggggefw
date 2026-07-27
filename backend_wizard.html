@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Axiom Backend Bridge Wizard</title>
+  <link rel="stylesheet" href="assets/axiom_dashboard.css" />
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Backend Bridge Wizard</h1>
+        <div class="subtitle">A secure multi-step setup helper for connecting the browser dashboard to a backend bridge. Browsers cannot safely start servers or store Axiom passwords, so this wizard configures and verifies a backend you control.</div>
+      </div>
+      <div class="badge"><span class="dot"></span><span id="wizardStatus">Not connected</span></div>
+    </header>
+
+    <section class="warning">This wizard does not collect your axiom.trade password. Keep Axiom credentials, wallet signing, and API tokens on the backend bridge.</section>
+
+    <section class="grid cols-3" style="margin-top:16px">
+      <div class="card"><h2>1. Bridge URL</h2><div class="card-body"><label>Backend bridge URL<input id="wizardBackendUrl" value="http://127.0.0.1:8787" /></label><button id="wizardSaveUrl" class="primary" style="margin-top:12px">Save URL</button></div></div>
+      <div class="card"><h2>2. Login</h2><div class="card-body"><label>Email<input id="wizardEmail" type="email" /></label><label>Password<input id="wizardPassword" type="password" /></label><button id="wizardLogin" class="primary" style="margin-top:12px">Login to bridge</button></div></div>
+      <div class="card"><h2>3. Verify</h2><div class="card-body"><button id="wizardHealth" class="ghost">Health check</button><button id="wizardCandidates" class="ghost">Fetch candidates</button><button id="wizardOpenDashboard" class="primary">Open dashboard</button></div></div>
+    </section>
+
+    <section class="card" style="margin-top:16px"><h2>Wizard log</h2><div class="card-body"><div id="wizardLog" class="log"></div></div></section>
+  </main>
+  <script src="assets/backend_wizard.js" defer></script>
+</body>
+</html>
