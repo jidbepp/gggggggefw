@@ -40,9 +40,27 @@
         maxSellTax: number('maxSellTax'),
         minVolumeAcceleration: number('minVolumeAcceleration'),
         tradingMode: $('tradingMode').value,
-        backendUrl: $('backendUrl').value.trim().replace(/\/$/, ''),
+        backendUrl: normalizeBackendUrl($('backendUrl').value),
         enableLiveFunds: $('enableLiveFunds').checked
       };
+    }
+
+    function normalizeBackendUrl(raw) {
+      const value = String(raw || '').trim().replace(/\/$/, '');
+      if (!value && location.protocol.startsWith('http')) return location.origin;
+      if (!value) return '';
+      try {
+        const url = new URL(value);
+        const badPath = url.pathname && url.pathname !== '/';
+        if (badPath || /\.html/i.test(value)) return '';
+        return url.origin;
+      } catch {
+        return '';
+      }
+    }
+
+    function explainBackendUrl() {
+      return 'Backend URL must be the bridge origin only, e.g. http://127.0.0.1:8787. Do not use /axiom_dashboard.html or the Python server URL.';
     }
 
     function number(id) { return Number($(id).value); }
@@ -53,7 +71,7 @@
 
     async function fetchCandidates(cfg) {
       if (cfg.tradingMode !== 'live_bridge') return generateCandidates(cfg.candidateBatchSize || 16);
-      if (!cfg.backendUrl) throw new Error('Backend bridge URL is required for live bridge mode.');
+      if (!cfg.backendUrl) throw new Error(explainBackendUrl());
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), cfg.turboMode ? 1500 : 5000);
       const response = await fetch(`${cfg.backendUrl}/candidates?limit=${encodeURIComponent(cfg.candidateBatchSize || 16)}`, {
@@ -154,13 +172,12 @@
     }
 
     async function placeOrder(side, tokenOrPosition, sizeUsd, cfg, reason = '') {
-      if (cfg.tradingMode === 'paper') {
-        return { status: 'filled', mode: 'paper', side, sizeUsd };
+      if (cfg.tradingMode === 'paper' || !cfg.enableLiveFunds) {
+        return { status: 'filled', mode: cfg.tradingMode === 'paper' ? 'paper' : 'paper_backend_candidates', side, sizeUsd };
       }
-      if (!cfg.enableLiveFunds) throw new Error('Live funds checkbox must be enabled before sending live bridge orders.');
       if (!state.authToken) throw new Error('Connect to your backend bridge before sending live orders.');
       if (!state.backendHealthy) throw new Error('Backend bridge must pass health check before live orders.');
-      if (!cfg.backendUrl) throw new Error('Backend bridge URL is required.');
+      if (!cfg.backendUrl) throw new Error(explainBackendUrl());
       const response = await fetch(`${cfg.backendUrl}/orders`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
@@ -311,7 +328,7 @@
       const cfg = config();
       const email = $('backendEmail').value.trim();
       const password = $('backendPassword').value;
-      if (!cfg.backendUrl) { log('Backend URL is required before connecting.'); return; }
+      if (!cfg.backendUrl) { log(explainBackendUrl()); return; }
       if (!email || !password) { log('Backend email and password are required.'); return; }
       try {
         const response = await fetch(`${cfg.backendUrl}/auth/login`, {
@@ -351,12 +368,12 @@
 
     async function testBackend() {
       const cfg = config();
-      if (!cfg.backendUrl) { log('Backend URL is required for health check.'); return; }
+      if (!cfg.backendUrl) { log(explainBackendUrl()); return; }
       try {
         const response = await fetch(`${cfg.backendUrl}/health`, { headers: authHeaders({ 'Accept': 'application/json' }) });
         if (!response.ok) throw new Error(`health returned ${response.status}`);
         state.backendHealthy = true;
-        log('Backend bridge health check passed. Live bridge can be armed if you enable live funds.');
+        log('Backend bridge health check passed. You can use backend candidates with paper fills; live funds remain off until explicitly enabled.');
       } catch (error) {
         state.backendHealthy = false;
         log(`Backend bridge health check failed: ${error.message}`);
@@ -365,15 +382,38 @@
     }
 
     function saveSettings() {
-      localStorage.setItem(storageKey, JSON.stringify(config()));
+      const cfg = config();
+      if ($('backendUrl').value && !cfg.backendUrl) { log(explainBackendUrl()); return; }
+      localStorage.setItem(storageKey, JSON.stringify(cfg));
       log('Settings saved in this browser.');
+    }
+
+    function resetSettings() {
+      localStorage.removeItem(storageKey);
+      sessionStorage.removeItem('axiom-dashboard-backend-token');
+      state.authToken = '';
+      state.backendHealthy = false;
+      $('tradingMode').value = 'paper';
+      $('backendUrl').value = location.protocol.startsWith('http') ? location.origin : '';
+      $('enableLiveFunds').checked = false;
+      updateAuthUi();
+      updateModeUi();
+      log('Saved settings reset. Paper mode is active.');
     }
 
     function loadSettings() {
       const raw = localStorage.getItem(storageKey);
-      if (!raw) return;
+      if (!raw) { if (!$('backendUrl').value && location.protocol.startsWith('http')) $('backendUrl').value = location.origin; return; }
       try {
         const saved = JSON.parse(raw);
+        if (saved.backendUrl && !normalizeBackendUrl(saved.backendUrl)) {
+          saved.backendUrl = location.protocol.startsWith('http') ? location.origin : '';
+          saved.tradingMode = 'paper';
+          saved.enableLiveFunds = false;
+          sessionStorage.removeItem('axiom-dashboard-backend-token');
+          state.authToken = '';
+          log('Invalid saved backend URL was reset. Paper mode is active.');
+        }
         for (const [key, value] of Object.entries(saved)) {
           const el = $(key);
           if (!el) continue;
@@ -416,6 +456,7 @@
     $('loginBackendBtn').addEventListener('click', loginBackend);
     $('logoutBackendBtn').addEventListener('click', logoutBackend);
     $('saveSettingsBtn').addEventListener('click', saveSettings);
+    $('resetSettingsBtn').addEventListener('click', resetSettings);
     $('tradingMode').addEventListener('change', () => updateModeUi());
     $('enableLiveFunds').addEventListener('change', () => updateModeUi());
     loadSettings();
@@ -424,4 +465,4 @@
     renderMetrics();
     renderCandidates([]);
     renderPositions();
-    log('Dashboard ready. Press Start auto-trader to begin paper-mode scanning.');
+    log('Dashboard ready. Use Paper / sandbox first. If using this Node server, backend URL should be ' + (location.protocol.startsWith('http') ? location.origin : 'http://127.0.0.1:8787') + '.');

@@ -12,7 +12,9 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
 const http = require('http');
+const path = require('path');
 
 const config = {
   host: process.env.BRIDGE_HOST || '127.0.0.1',
@@ -24,7 +26,7 @@ const config = {
   axiomApiBase: (process.env.AXIOM_API_BASE || '').replace(/\/$/, ''),
   axiomApiToken: process.env.AXIOM_API_TOKEN || '',
   liveOrderWebhook: process.env.LIVE_ORDER_WEBHOOK || '',
-  marketProvider: (process.env.MARKET_PROVIDER || 'dexscreener').toLowerCase(),
+  marketProvider: (process.env.MARKET_PROVIDER || 'synthetic').toLowerCase(),
   dexscreenerBase: 'https://api.dexscreener.com',
   birdeyeApiKey: process.env.BIRDEYE_API_KEY || '',
   allowedOrigin: process.env.ALLOWED_ORIGIN || '*',
@@ -32,6 +34,7 @@ const config = {
   maxOrderUsd: Number(process.env.MAX_ORDER_USD || 25),
   minLiquidityUsd: Number(process.env.MIN_LIQUIDITY_USD || 8000),
   allowedChains: (process.env.ALLOWED_CHAINS || 'solana,base,bsc,ethereum').split(',').map((x) => x.trim()).filter(Boolean),
+  staticRoot: path.resolve(__dirname),
 };
 
 const sessions = new Map();
@@ -56,6 +59,49 @@ function json(res, status, payload) {
   res.writeHead(status, corsHeaders({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) }));
   res.end(body);
 }
+
+const contentTypes = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+};
+const staticAllowList = new Set([
+  '/',
+  '/axiom_dashboard.html',
+  '/backend_wizard.html',
+  '/assets/axiom_dashboard.css',
+  '/assets/axiom_dashboard.js',
+  '/assets/backend_wizard.js',
+  '/settings.example.json',
+]);
+function text(res, status, body, contentType = 'text/plain; charset=utf-8') {
+  res.writeHead(status, corsHeaders({ 'Content-Type': contentType, 'Content-Length': Buffer.byteLength(body) }));
+  res.end(body);
+}
+function serveStatic(req, res, url) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  const pathname = url.pathname === '/' ? '/axiom_dashboard.html' : url.pathname;
+  if (pathname === '/favicon.ico') { res.writeHead(204, corsHeaders()); res.end(); return true; }
+  if (!staticAllowList.has(pathname)) return false;
+  const filePath = path.resolve(config.staticRoot, pathname.replace(/^\//, ''));
+  if (!filePath.startsWith(config.staticRoot + path.sep) && filePath !== path.join(config.staticRoot, 'axiom_dashboard.html')) {
+    text(res, 403, 'forbidden'); return true;
+  }
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) { text(res, 404, 'file not found'); return true; }
+  const body = fs.readFileSync(filePath);
+  res.writeHead(200, corsHeaders({
+    'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store',
+  }));
+  if (req.method === 'HEAD') res.end(); else res.end(body);
+  return true;
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -168,6 +214,7 @@ function validateOrder(order) {
 async function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (req.method === 'OPTIONS') return json(res, 204, {});
+  if (serveStatic(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/auth/login') {
     const body = await readBody(req);
     if (body.email !== config.dashboardEmail || body.password !== config.dashboardPassword) return json(res, 401, { error: 'invalid credentials' });
@@ -201,7 +248,9 @@ async function route(req, res) {
 const server = http.createServer((req, res) => { route(req, res).catch((error) => json(res, 500, { error: error.message })); });
 server.listen(config.port, config.host, () => {
   console.log(`Axiom local backend bridge listening on http://${config.host}:${config.port}`);
+  console.log(`Open dashboard: http://${config.host}:${config.port}/axiom_dashboard.html`);
+  console.log(`Open setup wizard: http://${config.host}:${config.port}/backend_wizard.html`);
   console.log(`Dashboard login email: ${config.dashboardEmail}`);
   console.log(`Market provider: ${config.marketProvider}; live orders: ${config.enableLiveOrders ? 'ENABLED' : 'disabled/paper acknowledgements'}`);
-  console.log('Chromebook tip: run this in Linux Terminal, then open backend_wizard.html or axiom_dashboard.html in Chrome.');
+  console.log('Chromebook tip: use this one Node server for both the dashboard and backend API. No python3 -m http.server is required.');
 });
