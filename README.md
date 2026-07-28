@@ -38,16 +38,51 @@ DASHBOARD_EMAIL=you@example.com DASHBOARD_PASSWORD='use-a-strong-password' node 
 # dashboard Backend bridge URL: http://127.0.0.1:8787
 ```
 
-The browser dashboard is fully functional in offline paper mode on a Chromebook. It can also authenticate to the included local backend bridge with `POST /auth/login`, `GET /health`, `GET /candidates`, and `POST /orders` endpoints, but Axiom passwords, private keys, exchange secrets, wallet signing, and API credentials must stay on that backend instead of in the static HTML.
+The bridge is dependency-free and uses Node 18+ built-in `fetch`. By default it pulls real token candidates from the DEX Screener public API (`MARKET_PROVIDER=dexscreener`) and returns paper order acknowledgements. You can force offline demo data with `MARKET_PROVIDER=synthetic`.
+
+The browser dashboard is fully functional in offline paper mode on a Chromebook. It can also authenticate to the included local backend bridge with `POST /auth/login`, `GET /health`, `GET /candidates`, `POST /orders`, and `GET /audit` endpoints, but Axiom passwords, private keys, exchange secrets, wallet signing, and API credentials must stay on that backend instead of in the static HTML.
+
+## Chromebook setup
+
+1. On the Chromebook, enable **Linux development environment** in ChromeOS settings.
+2. Open the Linux Terminal and install runtime packages if needed:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y nodejs npm python3
+   ```
+
+3. Download/extract this repository, then run the local bridge:
+
+   ```bash
+   cd ~/Downloads/gggggggefw   # or the folder where you extracted the repo
+   DASHBOARD_EMAIL=you@example.com DASHBOARD_PASSWORD='make-this-long' node local_backend_bridge.js
+   ```
+
+4. In Chrome, open `backend_wizard.html`, use bridge URL `http://127.0.0.1:8787`, log in with the email/password from step 3, test health, fetch candidates, then open the dashboard.
+5. Keep `Enable live funds` unchecked until you have a real, authorized execution webhook/API and have tested with tiny limits.
+
+## Useful backend environment variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DASHBOARD_EMAIL` / `DASHBOARD_PASSWORD` | `local@example.test` / unsafe default | Login for the browser dashboard. Always set both. |
+| `MARKET_PROVIDER` | `dexscreener` | `dexscreener` for live market candidates or `synthetic` for offline demo data. |
+| `ALLOWED_CHAINS` | `solana,base,bsc,ethereum` | Comma-separated chains accepted from the market provider. |
+| `MAX_ORDER_USD` | `25` | Backend-side per-order hard cap. |
+| `ENABLE_LIVE_ORDERS` | `false` | Must be `true` before the bridge will forward orders. |
+| `LIVE_ORDER_WEBHOOK` | empty | Your own authenticated order service endpoint. Recommended execution seam. |
+| `AXIOM_API_BASE` / `AXIOM_API_TOKEN` | empty | Optional Axiom-compatible endpoint/token if you have official authorized API access. |
+| `ALLOWED_ORIGIN` | `*` | Set to your dashboard origin for stricter browser CORS. |
 
 ## Making it live safely
 
-1. Keep `mode` set to `paper` while testing.
-2. Replace `MarketDataProvider.fetch_candidates()` with an official market-data API or stream you are authorized to use.
-3. For the HTML dashboard, use `local_backend_bridge.js` or expose an equivalent bridge with `POST /auth/login`, `GET /health`, `GET /candidates`, and `POST /orders`; keep all Axiom credentials, secrets, wallets, signing, authentication, and rate limiting on that server.
-4. For the Python app, implement a dedicated live subclass/adapter for `OrderExecutor.buy()` and `OrderExecutor.sell()` using a broker or exchange API you are authorized to use.
-5. Backtest and forward-test with logs before enabling live orders.
-6. Only enable live bridge/live order settings after you understand the failure modes, fees, slippage, and legal/compliance obligations.
+1. Keep Python `mode` set to `paper` and dashboard `Trading mode` set to `Paper / sandbox` while testing.
+2. The included bridge can fetch real market candidates from DEX Screener's public API, whose docs list endpoints such as latest token profiles and token pairs. Axiom.trade public API availability is not clearly documented; do not scrape or bypass platform controls.
+3. For live orders, point `LIVE_ORDER_WEBHOOK` (recommended) or `AXIOM_API_BASE` at an order service you control and are authorized to use, then set `ENABLE_LIVE_ORDERS=true`.
+4. Keep all Axiom credentials, API tokens, private keys, wallets, signing, rate limiting, and compliance checks on the backend service. Never put them in the browser dashboard.
+5. Backtest and forward-test with audit logs, tiny `MAX_ORDER_USD`, stop-losses, and daily loss limits before enabling meaningful live funds.
+6. Only enable live bridge/live order settings after you understand failure modes, fees, taxes, slippage, MEV, RPC outages, and legal/compliance obligations.
 
 ## Why no "no-loss sniper" claim?
 

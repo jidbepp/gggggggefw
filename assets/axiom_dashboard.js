@@ -82,7 +82,12 @@
         mintDisabled: Boolean(token.mintDisabled ?? token.mint_disabled),
         liquidityLocked: Boolean(token.liquidityLocked ?? token.liquidity_locked),
         age: Number(token.age ?? token.age_minutes ?? 999),
-        marketCap: Number(token.marketCap ?? token.market_cap_usd ?? Number.MAX_SAFE_INTEGER)
+        marketCap: Number(token.marketCap ?? token.market_cap_usd ?? Number.MAX_SAFE_INTEGER),
+        provider: String(token.provider || 'backend'),
+        chainId: String(token.chainId || token.chain_id || ''),
+        dexId: String(token.dexId || token.dex_id || ''),
+        url: String(token.url || ''),
+        riskFlags: Array.isArray(token.riskFlags) ? token.riskFlags : []
       };
     }
 
@@ -233,14 +238,14 @@
       }
       $('candidateRows').innerHTML = rows.map(({ token, scored, decision }) => `
         <tr>
-          <td><strong>${token.symbol}</strong><br><span class="pill">${token.address.slice(0, 8)}…</span></td>
+          <td><strong>${escapeHtml(token.symbol)}</strong><br><span class="pill">${escapeHtml(token.chainId || token.provider || 'paper')} ${token.address.slice(0, 8)}…</span></td>
           <td class="score ${scored.score >= 72 ? 'good' : scored.score >= 55 ? 'warn' : 'bad'}">${scored.score}</td>
           <td>${fmt.format(token.price)}</td>
           <td>${fmt.format(token.liquidity)}</td>
           <td>${fmt.format(token.marketCap)}</td>
           <td>${round(token.age)}m</td>
           <td>${round(scored.volumeAcceleration)}x / ${round(token.priceChange5m)}%</td>
-          <td>${decision === 'Qualified' ? '<span class="pill buy">Qualified</span>' : `<span class="pill">${decision}</span>`}</td>
+          <td>${decision === 'Qualified' ? '<span class="pill buy">Qualified</span>' : `<span class="pill">${escapeHtml(decision)}</span>`}</td>
         </tr>`).join('');
     }
 
@@ -400,6 +405,7 @@
     }
 
     function round(value) { return Math.round(value * 100) / 100; }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 
     $('startBtn').addEventListener('click', start);
     $('stopBtn').addEventListener('click', stop);
