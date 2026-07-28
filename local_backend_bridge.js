@@ -16,6 +16,23 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
+loadEnvFile(process.env.BRIDGE_ENV_FILE || '.env.local');
+
+function loadEnvFile(fileName) {
+  const filePath = path.resolve(__dirname, fileName);
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!match || process.env[match[1]] !== undefined) continue;
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    process.env[match[1]] = value;
+  }
+}
+
 const config = {
   host: process.env.BRIDGE_HOST || '127.0.0.1',
   port: Number(process.env.BRIDGE_PORT || 8787),
@@ -26,6 +43,7 @@ const config = {
   axiomApiBase: (process.env.AXIOM_API_BASE || '').replace(/\/$/, ''),
   axiomApiToken: process.env.AXIOM_API_TOKEN || '',
   liveOrderWebhook: process.env.LIVE_ORDER_WEBHOOK || '',
+  liveOrderAuthHeader: process.env.LIVE_ORDER_AUTH_HEADER || '',
   marketProvider: (process.env.MARKET_PROVIDER || 'synthetic').toLowerCase(),
   dexscreenerBase: 'https://api.dexscreener.com',
   birdeyeApiKey: process.env.BIRDEYE_API_KEY || '',
@@ -34,6 +52,7 @@ const config = {
   maxOrderUsd: Number(process.env.MAX_ORDER_USD || 25),
   minLiquidityUsd: Number(process.env.MIN_LIQUIDITY_USD || 8000),
   allowedChains: (process.env.ALLOWED_CHAINS || 'solana,base,bsc,ethereum').split(',').map((x) => x.trim()).filter(Boolean),
+  providerConcurrency: Math.max(1, Math.min(10, Number(process.env.PROVIDER_CONCURRENCY || 6))),
   staticRoot: path.resolve(__dirname),
 };
 
@@ -147,16 +166,30 @@ async function fetchDexscreenerCandidates(limit) {
   const selected = (Array.isArray(profiles) ? profiles : [])
     .filter((p) => config.allowedChains.includes(String(p.chainId || '').toLowerCase()))
     .slice(0, Math.min(30, Math.max(limit * 2, limit)));
-  const candidates = [];
-  for (const profile of selected) {
-    if (candidates.length >= limit) break;
+  const candidates = (await mapLimit(selected, config.providerConcurrency, async (profile) => {
     try {
       const pairsData = await getJson(`${config.dexscreenerBase}/token-pairs/v1/${encodeURIComponent(profile.chainId)}/${encodeURIComponent(profile.tokenAddress)}`, { timeoutMs: 6000 });
       const pair = (Array.isArray(pairsData) ? pairsData : []).sort((a, b) => Number(b?.liquidity?.usd || 0) - Number(a?.liquidity?.usd || 0))[0];
-      if (pair) candidates.push(normalizeDexPair(pair, profile));
-    } catch (error) { audit.push({ ts: now(), event: 'provider_warning', provider: 'dexscreener', error: error.message.slice(0, 220) }); }
-  }
-  return ttlSet(cacheKey, candidates.length ? candidates : syntheticCandidates(limit), 30_000);
+      return pair ? normalizeDexPair(pair, profile) : null;
+    } catch (error) {
+      audit.push({ ts: now(), event: 'provider_warning', provider: 'dexscreener', error: error.message.slice(0, 220) });
+      return null;
+    }
+  })).filter(Boolean).slice(0, limit);
+  return ttlSet(cacheKey, candidates.length ? candidates : syntheticCandidates(limit), 20_000);
+}
+
+async function mapLimit(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 function normalizeDexPair(pair, profile = {}) {
@@ -196,6 +229,10 @@ async function proxyLiveOrder(order) {
   if (!target) throw new Error('LIVE_ORDER_WEBHOOK or AXIOM_API_BASE is required when ENABLE_LIVE_ORDERS=true');
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
   if (config.axiomApiToken) headers.Authorization = `Bearer ${config.axiomApiToken}`;
+  if (config.liveOrderAuthHeader) {
+    const separator = config.liveOrderAuthHeader.indexOf(':');
+    if (separator > 0) headers[config.liveOrderAuthHeader.slice(0, separator).trim()] = config.liveOrderAuthHeader.slice(separator + 1).trim();
+  }
   const response = await fetch(target, { method: 'POST', headers, body: JSON.stringify({ ...order, submittedAt: now(), source: 'axiom-local-backend-bridge' }) });
   const body = await response.text();
   if (!response.ok) throw new Error(`live order endpoint failed ${response.status}: ${body.slice(0, 300)}`);
@@ -225,7 +262,7 @@ async function route(req, res) {
   }
   if (url.pathname === '/health') {
     const session = requireAuth(req, res); if (!session) return;
-    return json(res, 200, { ok: true, ts: now(), marketProvider: config.marketProvider, mode: config.enableLiveOrders ? 'live_adapter_enabled' : 'paper_bridge', liveReady: Boolean(config.enableLiveOrders && (config.liveOrderWebhook || config.axiomApiBase)), maxOrderUsd: config.maxOrderUsd, user: session.email });
+    return json(res, 200, { ok: true, ts: now(), marketProvider: config.marketProvider, providerConcurrency: config.providerConcurrency, mode: config.enableLiveOrders ? 'live_adapter_enabled' : 'paper_bridge', liveReady: Boolean(config.enableLiveOrders && (config.liveOrderWebhook || config.axiomApiBase)), maxOrderUsd: config.maxOrderUsd, user: session.email });
   }
   if (req.method === 'GET' && url.pathname === '/candidates') {
     const session = requireAuth(req, res); if (!session) return;

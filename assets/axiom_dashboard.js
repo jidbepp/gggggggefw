@@ -11,6 +11,7 @@
       cooldowns: new Map(),
       audit: [],
       backendHealthy: false,
+      scanning: false,
       authToken: sessionStorage.getItem('axiom-dashboard-backend-token') || ''
     };
 
@@ -225,6 +226,8 @@
     }
 
     async function scan() {
+      if (state.scanning) { log('Previous scan is still running; skipped overlapping scan.'); return; }
+      state.scanning = true;
       const cfg = config();
       try {
         updateModeUi(cfg);
@@ -245,6 +248,8 @@
       } catch (error) {
         log(`ERROR: ${error.message}`);
         stop();
+      } finally {
+        state.scanning = false;
       }
     }
 
@@ -296,7 +301,7 @@
       $('statusText').textContent = `Running · ${cfg.tradingMode === 'live_bridge' ? 'Live bridge' : 'Paper mode'}`;
       log(`Auto-trader started in ${cfg.tradingMode === 'live_bridge' ? 'LIVE BRIDGE' : 'PAPER MODE'}`);
       scan();
-      const intervalMs = cfg.turboMode ? Math.max(250, cfg.pollSeconds * 1000) : Math.max(1000, cfg.pollSeconds * 1000);
+      const intervalMs = cfg.turboMode ? Math.max(500, cfg.pollSeconds * 1000) : Math.max(1000, cfg.pollSeconds * 1000);
       state.timer = setInterval(() => scan(), intervalMs);
     }
 

@@ -38,14 +38,30 @@ git clone <your-repo-url> gggggggefw
 cd gggggggefw
 ```
 
-### 4. Start the all-in-one local server
+### 4. Create your local secrets file
 
-Start with synthetic data first so you can prove everything works without network/API issues:
+Copy the example environment file. This is where API keys and live-account secrets go. Do **not** put secrets in the HTML files.
 
 ```bash
-DASHBOARD_EMAIL=you@example.com \
-DASHBOARD_PASSWORD='change-this-password' \
-MARKET_PROVIDER=synthetic \
+cp .env.example .env.local
+nano .env.local
+```
+
+For first setup, keep these values in `.env.local`:
+
+```bash
+DASHBOARD_EMAIL=you@example.com
+DASHBOARD_PASSWORD=change-this-long-random-password
+MARKET_PROVIDER=synthetic
+ENABLE_LIVE_ORDERS=false
+MAX_ORDER_USD=25
+```
+
+### 5. Start the all-in-one local server
+
+The bridge automatically loads `.env.local`. Start with synthetic data first so you can prove everything works without network/API issues:
+
+```bash
 node local_backend_bridge.js
 ```
 
@@ -57,7 +73,7 @@ Open dashboard: http://127.0.0.1:8787/axiom_dashboard.html
 Open setup wizard: http://127.0.0.1:8787/backend_wizard.html
 ```
 
-### 5. Open the dashboard
+### 6. Open the dashboard
 
 Open this exact URL in Chrome:
 
@@ -138,16 +154,38 @@ But the **Backend bridge URL** field must still be:
 http://127.0.0.1:8787
 ```
 
-## API setup
+## API setup, keys, and live funds
+
+### Where keys go
+
+Put keys in `.env.local`, which is loaded automatically by `local_backend_bridge.js`. Keep `.env.local` on your Chromebook/backend only. Never paste API keys, wallet private keys, seed phrases, Axiom passwords, or webhook secrets into `axiom_dashboard.html`, browser devtools, screenshots, GitHub issues, or commits.
+
+Safe file flow:
+
+```bash
+cp .env.example .env.local
+nano .env.local
+node local_backend_bridge.js
+```
+
+After editing `.env.local`, stop the bridge with `Ctrl+C` and restart it so the new values load.
 
 ### Synthetic/offline paper data, no API key
 
 Best for first setup:
 
 ```bash
-DASHBOARD_EMAIL=you@example.com \
-DASHBOARD_PASSWORD='change-this-password' \
-MARKET_PROVIDER=synthetic \
+# .env.local
+DASHBOARD_EMAIL=you@example.com
+DASHBOARD_PASSWORD=change-this-long-random-password
+MARKET_PROVIDER=synthetic
+ENABLE_LIVE_ORDERS=false
+MAX_ORDER_USD=25
+```
+
+Then run:
+
+```bash
 node local_backend_bridge.js
 ```
 
@@ -156,14 +194,22 @@ node local_backend_bridge.js
 DEX Screener publishes public API endpoints for token profiles and token pairs. The bridge uses those endpoints when `MARKET_PROVIDER=dexscreener`.
 
 ```bash
-DASHBOARD_EMAIL=you@example.com \
-DASHBOARD_PASSWORD='change-this-password' \
-MARKET_PROVIDER=dexscreener \
-ALLOWED_CHAINS=solana,base,bsc,ethereum \
+# .env.local
+DASHBOARD_EMAIL=you@example.com
+DASHBOARD_PASSWORD=change-this-long-random-password
+MARKET_PROVIDER=dexscreener
+ALLOWED_CHAINS=solana,base,bsc,ethereum
+PROVIDER_CONCURRENCY=6
+ENABLE_LIVE_ORDERS=false
+```
+
+Then run:
+
+```bash
 node local_backend_bridge.js
 ```
 
-If DEX Screener or your network fails, the bridge logs a provider fallback and returns synthetic candidates so the dashboard still works.
+If DEX Screener or your network fails, the bridge logs a provider fallback and returns synthetic candidates so the dashboard still works. Increase `PROVIDER_CONCURRENCY` up to `10` for faster scans, or lower it if your network is unstable.
 
 ### Birdeye API
 
@@ -171,39 +217,50 @@ Birdeye typically requires an account and API key from Birdeye's developer/API p
 
 The bridge currently exposes `BIRDEYE_API_KEY` as a placeholder environment variable, but the included code does not yet implement a Birdeye provider. Add a dedicated provider on the backend if you want Birdeye data.
 
-### Axiom API
+### Axiom API and live funds
 
-Axiom.trade does not appear to provide a broadly documented public trading API inside this repository. To get an Axiom API:
+Axiom.trade's public docs describe the trading terminal, but this repository does not include an official Axiom Trade order API schema. Search results also contain similarly named non-trading Axiom APIs and unofficial/third-party SDKs; do not assume those are official live-trading endpoints. To get a real Axiom Trade API:
 
-1. Sign in to your Axiom account.
-2. Check official Axiom account settings/docs for API access.
-3. If no API section exists, contact Axiom support and ask for official API documentation, base URL, authentication method, order endpoint, rate limits, and terms of use.
-4. Do not scrape Axiom pages, automate private login flows, bypass protections, or put your Axiom password in this dashboard.
+1. Sign in to your Axiom Trade account.
+2. Look for an official developer/API section in Axiom Trade account settings or official docs.
+3. If you do not see it, contact Axiom support and ask for: base URL, authentication format, order endpoint path, buy/sell payload schema, testnet/sandbox mode, rate limits, slippage fields, token address format, quote asset format, error codes, and terms of use.
+4. Do not scrape Axiom pages, automate private login flows, reuse browser cookies, bypass protections, or put your Axiom password in this dashboard.
 
-If Axiom gives you official API access, run the bridge like this:
+If Axiom gives you an official REST order API compatible with `POST {base}/orders`, put the values in `.env.local` like this:
 
 ```bash
-ENABLE_LIVE_ORDERS=true \
-AXIOM_API_BASE='https://official-api-url-from-axiom' \
-AXIOM_API_TOKEN='your-official-token' \
-MAX_ORDER_USD=5 \
-DASHBOARD_EMAIL=you@example.com \
-DASHBOARD_PASSWORD='change-this-password' \
-MARKET_PROVIDER=synthetic \
+# .env.local
+DASHBOARD_EMAIL=you@example.com
+DASHBOARD_PASSWORD=change-this-long-random-password
+MARKET_PROVIDER=dexscreener
+ENABLE_LIVE_ORDERS=true
+AXIOM_API_BASE=https://official-api-url-from-axiom
+AXIOM_API_TOKEN=your-official-token
+MAX_ORDER_USD=5
+PROVIDER_CONCURRENCY=6
+```
+
+Restart the bridge:
+
+```bash
 node local_backend_bridge.js
 ```
 
-Recommended professional live path: create your own order service and point the bridge at it:
+Recommended professional live path: create your own order service that handles wallet signing, Axiom-specific payloads, retries, idempotency, slippage, and compliance checks. Then point the bridge at your service:
 
 ```bash
-ENABLE_LIVE_ORDERS=true \
-LIVE_ORDER_WEBHOOK='https://your-own-order-service.example/orders' \
-MAX_ORDER_USD=5 \
-DASHBOARD_EMAIL=you@example.com \
-DASHBOARD_PASSWORD='change-this-password' \
-MARKET_PROVIDER=dexscreener \
-node local_backend_bridge.js
+# .env.local
+DASHBOARD_EMAIL=you@example.com
+DASHBOARD_PASSWORD=change-this-long-random-password
+MARKET_PROVIDER=dexscreener
+ENABLE_LIVE_ORDERS=true
+LIVE_ORDER_WEBHOOK=https://your-own-order-service.example/orders
+LIVE_ORDER_AUTH_HEADER=Authorization: Bearer replace-with-your-webhook-secret
+MAX_ORDER_USD=5
+PROVIDER_CONCURRENCY=6
 ```
+
+Restart the bridge, log in from the dashboard, run **Test backend bridge**, set a tiny max position, then enable **Enable live funds** only for a tiny test trade.
 
 ## Backend environment variables
 
@@ -213,11 +270,13 @@ node local_backend_bridge.js
 | `BRIDGE_PORT` | `8787` | Dashboard/API server port. |
 | `DASHBOARD_EMAIL` / `DASHBOARD_PASSWORD` | unsafe defaults | Browser login. Always set both. |
 | `MARKET_PROVIDER` | `synthetic` | `synthetic` or `dexscreener`. |
+| `PROVIDER_CONCURRENCY` | `6` | Parallel DEX Screener pair requests; use `1`-`10`. |
 | `ALLOWED_CHAINS` | `solana,base,bsc,ethereum` | DEX Screener chains to accept. |
 | `MAX_ORDER_USD` | `25` | Hard per-order backend cap. Use tiny values for live tests. |
 | `ENABLE_LIVE_ORDERS` | `false` | Must be `true` before orders are forwarded. |
 | `ALLOW_PAPER_ORDERS` | `true` | Allows paper acknowledgements when live orders are off. |
 | `LIVE_ORDER_WEBHOOK` | empty | Your own live order service endpoint. |
+| `LIVE_ORDER_AUTH_HEADER` | empty | Optional extra header for `LIVE_ORDER_WEBHOOK`, e.g. `Authorization: Bearer ...`. |
 | `AXIOM_API_BASE` / `AXIOM_API_TOKEN` | empty | Official Axiom-compatible API settings if Axiom grants access. |
 | `ALLOWED_ORIGIN` | `*` | Optional stricter CORS origin. |
 | `SESSION_TTL_SECONDS` | `28800` | Dashboard session lifetime. |
