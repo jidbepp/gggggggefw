@@ -52,6 +52,7 @@
             <button class="ghost" id="scanBtn">Scan once</button>
             <button class="ghost" id="exportBtn">Export audit JSON</button>
             <button class="ghost" id="saveSettingsBtn">Save settings</button>
+            <button class="ghost" id="resetSettingsBtn">Reset saved settings</button>
           </div>
           <div class="grid cols-2" style="margin-top:16px">
             <label>Starting balance USD<input id="startingBalance" type="number" min="1" step="1" value="1000" /></label>
@@ -67,7 +68,7 @@
             <label>Daily loss limit USD<input id="dailyLoss" type="number" min="1" step="1" value="75" /></label>
             <label>Cooldown seconds<input id="cooldown" type="number" min="0" step="1" value="120" /></label>
             <label>Trading mode<select id="tradingMode"><option value="paper">Paper / sandbox</option><option value="live_bridge">Live backend bridge</option></select></label>
-            <label>Backend bridge URL<input id="backendUrl" type="url" placeholder="https://your-backend.example" /></label>
+            <label>Backend bridge URL<input id="backendUrl" type="url" placeholder="http://127.0.0.1:8787" /></label>
             <label>Enable live funds<input id="enableLiveFunds" type="checkbox" /></label>
             <label>Backend tools<button class="ghost" id="testBackendBtn" type="button">Test backend bridge</button></label>
           </div>
